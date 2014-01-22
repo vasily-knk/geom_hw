@@ -231,10 +231,10 @@ namespace visualization
 
 
 
-void main(int argc, char** argv)
+int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
     visualization::segment_tree_viewer viewer;
     visualization::run_viewer(&viewer, "Segment tree");
-    //range_test();
+	return 0;
 }

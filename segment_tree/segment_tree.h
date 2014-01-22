@@ -14,22 +14,6 @@ inline range_t y_range(const segment_t &segment)
     return range_t(std::min(segment[0].y, segment[1].y), std::max(segment[0].y, segment[1].y));
 }
 
-
-inline coord_t value_for_x(const segment_t &segment, coord_t x)
-{
-    const range_t rg = x_range(segment);
-    if (!rg.contains(x))
-        throw std::logic_error("x value outside segment");
-
-    if (segment[0].x == segment[1].x)
-        return segment[0].y;
-
-    const double ratio = double(x - segment[0].x) / double(segment[1].x - segment[0].x);
-    const double offset = ratio * double(segment[1].y - segment[0].y);
-    return segment[0].y + coord_t(offset);
-}
-
-
 bool point_to_the_left(const segment_t &segment, const point_t &point)
 {
     const vector_t v1 = segment[1] - segment[0];
@@ -62,8 +46,9 @@ bool compare_segments(const segment_t &s1, const segment_t &s2)
 struct segment_tree_t
 {
     typedef vector<segment_t> segments_t;
-    typedef uint32_t range_it;
-    typedef vector<range_it> range_its;
+    typedef uint32_t segment_id_t;
+    typedef vector<segment_id_t> ids_t;
+    typedef unordered_set<segment_id_t> result_t;
 
     struct query_t
     {
@@ -76,25 +61,29 @@ struct segment_tree_t
         range_t y;
     };
 
-    segment_tree_t(const segments_t &ranges)
-        : root_(build_tree(ranges))
-        , segments_(ranges)
+    segment_tree_t(const segments_t &segments)
+        : root_(build_tree(segments))
+        , segments_(segments)
     {
-        insert_segments();
-        check(root_);
+        if (!segments.empty())
+            insert_segments();
+        MY_ASSERT(check(root_));
     }
 
-    range_its query(const query_t &q) const
+    result_t query(const query_t &q) const
     {
-        range_its dst;
-        if (q.y.sup < q.y.inf)
-            return dst;
+        if (!root_)
+            return result_t();
 
+        if (q.y.sup < q.y.inf)
+            return result_t();
+
+        result_t dst;
         query(q, root_, dst);
         return dst;
     }
 
-    uint32_t get_id(range_it it) const
+    uint32_t get_id(segment_id_t it) const
     {
         return it;
     }
@@ -113,7 +102,7 @@ private:
         {}
 
         range_t interval;
-        range_its segments;
+        ids_t segments;
     };
 
     typedef node_base_t<node_data_t> node_t;
@@ -153,6 +142,9 @@ private:
 
     static node_ptr build_tree(const segments_t &segments)
     {
+        if (segments.empty())
+            return node_ptr();
+        
         std::set<coord_t> endpoints;
         BOOST_FOREACH(const auto &segment, segments)
         {
@@ -186,7 +178,7 @@ private:
     }
 
 private:
-    void insert_segment(range_it it, node_ptr node)
+    void insert_segment(segment_id_t it, node_ptr node)
     {
         // can't have only right child
         MY_ASSERT(node->l() || !node->r());
@@ -225,7 +217,7 @@ private:
 
     void sort_segments(node_ptr node)
     {
-        auto comp = [this, node](range_it it1, range_it it2) -> bool
+        auto comp = [this, node](segment_id_t it1, segment_id_t it2) -> bool
         {
             return compare_segments(segments_.at(it1), segments_.at(it2));;
         };
@@ -239,14 +231,14 @@ private:
             sort_segments(node->r());
     }
 
-    void query(query_t q, node_ptr node, range_its &dst) const
+    void query(query_t q, node_ptr node, result_t &dst) const
     {
         const range_t interval = node->value().interval;
         if (q.x < interval.inf || q.x > interval.sup)
             return;
 
         // extraction
-        auto comp = [this](range_it it, const point_t &point) -> bool
+        auto comp = [this](segment_id_t it, const point_t &point) -> bool
         {
             const segment_t os(geom::structures::min(segments_.at(it)), geom::structures::max(segments_.at(it)));
             const bool res1 = point_to_the_left(os, point);
@@ -257,7 +249,7 @@ private:
         const auto it1 = boost::lower_bound(segments, point_t(q.x, q.y.inf), comp);
         const auto it2 = boost::lower_bound(segments, point_t(q.x, q.y.sup), comp);
 
-        std::copy(it1, it2, std::back_inserter(dst));
+        std::copy(it1, it2, std::inserter(dst, dst.end()));
 
         if (node->l() && node->l()->value().interval.contains(q.x))
             query(q, node->l(), dst);
@@ -265,8 +257,11 @@ private:
             query(q, node->r(), dst);
     }
 
-    static void check(node_ptr node)
+    static bool check(node_ptr node)
     {
+        if (!node)
+            return true;
+        
         // can't have only right child
         MY_ASSERT(node->l() || !node->r());
         const auto interval = node->value().interval;
@@ -279,7 +274,6 @@ private:
             MY_ASSERT(int_l.inf == interval.inf);
             MY_ASSERT(int_r.sup == interval.sup);
 
-            const auto intersection = int_l & int_r;
             MY_ASSERT(int_l.sup == int_r.inf - 1);
         }
 
@@ -288,6 +282,8 @@ private:
 
         if (node->r())
             check(node->r());
+
+        return true;
     }
 
 private:

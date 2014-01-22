@@ -1,0 +1,6 @@
+debug
+release
+bin
+*.sln*
+*.vcxproj*
+*.sdf

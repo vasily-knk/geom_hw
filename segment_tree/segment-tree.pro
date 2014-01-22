@@ -21,9 +21,7 @@ PRECOMPILED_HEADER = stdafx.h
 HEADERS += \
 	common.h \
 	primitives.h \
-	range_tree.h \
 	segment_tree.h \
-	segment_windowing.h \
 	stdafx.h \
 	tree.h
 

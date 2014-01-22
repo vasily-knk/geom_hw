@@ -12,6 +12,7 @@ QMAKE_CXXFLAGS = -std=c++0x -Wall
 
 macx {
     QMAKE_CXXFLAGS += -stdlib=libc++  
+    QMAKE_LFLAGS += -lc++
 }
 
 CONFIG += precompile_header
